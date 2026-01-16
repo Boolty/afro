@@ -1022,7 +1022,19 @@ class Apfs(KaitaiStruct):
         if hasattr(self, '_m_block_size'):
             return self._m_block_size if hasattr(self, '_m_block_size') else None
 
-        self._m_block_size = self._root.block0.body.nx_block_size
+        # If block0 is a checkpoint map, we need to find the NX superblock
+        if isinstance(self._root.block0.body, self._root.CheckpointMapPhysT):
+            # Search for mapping with type object_type_nx_superblock
+            for mapping in self._root.block0.body.cpm_map:
+                if mapping.cpm_type == self._root.ObjectType.object_type_nx_superblock:
+                    # Get the NX superblock object via its paddr
+                    nx_sb = mapping.cpm_paddr.target
+                    if nx_sb and hasattr(nx_sb.body, 'nx_block_size'):
+                        self._m_block_size = nx_sb.body.nx_block_size
+                        return self._m_block_size
+            # If not found, fallback to default 4096 (common APFS block size)
+            self._m_block_size = 4096
+        else:
+            # Direct NX superblock
+            self._m_block_size = self._root.block0.body.nx_block_size
         return self._m_block_size if hasattr(self, '_m_block_size') else None
-
-
